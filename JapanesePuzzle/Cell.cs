@@ -6,13 +6,13 @@ using System.Threading.Tasks;
 
 namespace JapanesePuzzle
 {
-    public class Point
+    public class Cell
     {
         public int Line { get; set; }
         public int Column { get; set; }
         public int Value { get; set; }
 
-        public Point(int line, int column, int value)
+        public Cell(int line, int column, int value)
         {
             Line = line;
             Column = column;
