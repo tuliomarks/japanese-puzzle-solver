@@ -161,116 +161,166 @@ namespace JapanesePuzzle
             else if (NextStep == 2)
             {
                 #region Verifica as linha com uma Clue e um valor preenchido e então estima a pintura e restante fica com X
+                // tambem verifica se é o restante e pinta
+
                 for (int i = 0; i < LinesClues.Length; i++)
                 {
 
-                    if (LinesClues[i].Length > 1) continue;
-                    var primaryClue = LinesClues[i][0];
-                    foreach (var cell in Grid.Where(x => x.Line == i && x.Value == 1))
+                    var paintedCells = Grid.Where(x => x.Line == i && x.Value == 1).ToArray();
+                    var groups = 0;
+                    for (int j = 0; j < paintedCells.Count(); j++)
                     {
+                        if (j == 0)
+                        {
+                            groups++;
+                            continue;
+                        }
+                        if (paintedCells[j].Column - paintedCells[j-1].Column > 1)
+                            groups++;
+                    }
+                    if (LinesClues[i].Length != paintedCells.Count()) continue;
+
+                    var currentClue = 0;
+                    var lastFinishRight = 0;
+                    var removedCells = new List<Cell>();
+                    foreach (var cell in paintedCells)
+                    {                        
+                        if (removedCells.Contains(cell)) continue;
+
+                        var clue = LinesClues[i][currentClue];
                         // aqui vai testar esquerda e direita da posicao que esta marcada e vai estimar os proximos
 
                         //se esta no inicio e as posicoes a esquerda necessarias estao livres entao marca elas
                         if (cell.Column == 0)
                         {
                             // se achou algum pintado entao nao eh ali que deve estar
-                            var cells = Grid.Where(x => x.Line == i && x.Column < primaryClue && x.Value == 1);
-                            if (cells.Any())
-                                foreach (var cell1 in cells)
-                                    cell1.Value = -1;
-                            else
-                                foreach (var cell1 in cells)
-                                    cell1.Value = 1;
+                            var cells = Grid.Where(x => x.Line == i && x.Column < clue && x.Value == 0);
+                            foreach (var cell1 in cells)
+                                cell1.Value = 1;                           
                         }
                         // se esta no final faz o mesmo teste para as colunas da esquerda
-                        else if (cell.Column == LineSize)
+                        else if (cell.Column == LineSize - 1)
                         {
                             // se achou algum pintado entao nao eh ali que deve estar
-                            var cells = Grid.Where(x => x.Line == i && x.Column > LineSize - primaryClue && x.Value == 1);
-                            if (cells.Any())
-                                foreach (var cell1 in cells)
-                                    cell1.Value = -1;
-                            else
-                                foreach (var cell1 in cells)
-                                    cell1.Value = 1;
+                            var cells = Grid.Where(x => x.Line == i && x.Column < LineSize - clue && x.Column >= lastFinishRight && x.Value == 0);
+                            foreach (var cell1 in cells)
+                                cell1.Value = -1;
+
+                            cells = Grid.Where(x => x.Line == i && x.Column >= LineSize - clue && x.Value == 0);
+                            foreach (var cell1 in cells)
+                                cell1.Value = 1;
                         }
                         // se nao esta no inicio nem no fim, obrigatoriamente esta no meio
                         else
                         {
-                            var startLeft = cell.Column - primaryClue;
-                            var finishRight = cell.Column + primaryClue;
+                            var startLeft = cell.Column - clue;
+                            var finishRight = cell.Column + clue;
 
-                            foreach (var cell1 in Grid.Where(x => x.Line == i && x.Column <= startLeft && x.Value == 0))
+                            // remove as celulas ja pintadas de dentro da faixa que pode chegar
+                            removedCells.AddRange(Grid.Where(x => x.Line == i && x.Column > startLeft && x.Column < finishRight && x.Value == 1));                            
+
+                            foreach (var cell1 in Grid.Where(x => x.Line == i && x.Column <= startLeft && x.Column >= lastFinishRight && x.Value == 0))
                                 cell1.Value = -1;
 
-                            foreach (var cell1 in Grid.Where(x => x.Line == i && x.Column >= finishRight && x.Value == 0))
-                                cell1.Value = -1;
+                            if (LinesClues[i].Length == 1 || currentClue == LinesClues[i].Length - 1) // só completa pra direita se não tem nenhum a direita
+                                foreach (var cell1 in Grid.Where(x => x.Line == i && x.Column >= finishRight && x.Value == 0))
+                                    cell1.Value = -1;
+
+                            var cells = Grid.Where(x => x.Line == i && x.Column > startLeft && x.Column < finishRight && (x.Value == 0 || x.Value == 1));
+                            if (cells.Count() == clue)
+                                foreach (var cell2 in cells.Where(x => x.Value == 0))
+                                    cell2.Value = 1;
+
+                            lastFinishRight = finishRight;
 
                         }
-
+                        currentClue++;
                     }
+
                 }
 
                 for (int i = 0; i < ColumnsClues.Length; i++)
                 {
 
-                    if (ColumnsClues[i].Length > 1) continue;
-                    var primaryClue = ColumnsClues[i][0];
-                    foreach (var cell in Grid.Where(x => x.Column == i && x.Value == 1))
+                    var paintedCells = Grid.Where(x => x.Column == i && x.Value == 1).ToArray();
+                    var groups = 0;
+                    for (int j = 0; j < paintedCells.Count(); j++)
                     {
+                        if (j == 0)
+                        {
+                            groups++;
+                            continue;
+                        }
+                        if (paintedCells[j].Line - paintedCells[j - 1].Line > 1)
+                            groups++;
+                    }
+                    if (ColumnsClues[i].Length != groups) continue;
+
+                    var currentClue = 0;
+                    var lastFinishBottom = 0;
+                    var removedCells = new List<Cell>();
+                    foreach (var cell in paintedCells)
+                    {
+                        if (removedCells.Contains(cell)) continue;
+
+                        var clue = ColumnsClues[i][currentClue];
                         // aqui vai testar esquerda e direita da posicao que esta marcada e vai estimar os proximos
 
                         //se esta no inicio e as posicoes a esquerda necessarias estao livres entao marca elas
                         if (cell.Line == 0)
                         {
                             // se achou algum pintado entao nao eh ali que deve estar
-                            var cells = Grid.Where(x => x.Column == i && x.Line < primaryClue && x.Value == 1);
-                            if (cells.Any())
-                                foreach (var cell1 in cells)
-                                    cell1.Value = -1;
-                            else
-                                foreach (var cell1 in cells)
-                                    cell1.Value = 1;
+                            var cells = Grid.Where(x => x.Column == i && x.Line < clue && x.Value == 0);
+                            foreach (var cell1 in cells)
+                                cell1.Value = 1;
                         }
                         // se esta no final faz o mesmo teste para as colunas da esquerda
-                        else if (cell.Line == ColumnSize)
+                        else if (cell.Line == ColumnSize - 1)
                         {
                             // se achou algum pintado entao nao eh ali que deve estar
-                            var cells = Grid.Where(x => x.Column == i && x.Line > ColumnSize - primaryClue && x.Value == 1);
-                            if (cells.Any())
-                                foreach (var cell1 in cells)
-                                    cell1.Value = -1;
-                            else
-                                foreach (var cell1 in cells)
-                                    cell1.Value = 1;
+                            var cells = Grid.Where(x => x.Column == i && x.Line < ColumnSize - clue && x.Line >= lastFinishBottom && x.Value == 0);
+                            foreach (var cell1 in cells)
+                                cell1.Value = -1;
+
+                            cells = Grid.Where(x => x.Column == i && x.Line >= ColumnSize - clue && x.Value == 0);
+                            foreach (var cell1 in cells)
+                                cell1.Value = 1;
                         }
                         // se nao esta no inicio nem no fim, obrigatoriamente esta no meio
                         else
                         {
-                            var startTop = cell.Line - primaryClue;
-                            var finishBottom = cell.Line + primaryClue;
+                            var startTop = cell.Line - clue;
+                            var finishBottom = cell.Line + clue;
 
-                            foreach (var cell1 in Grid.Where(x => x.Column == i && x.Line <= startTop && x.Value == 0))
+                            // remove as celulas ja pintadas de dentro da faixa que pode chegar
+                            removedCells.AddRange(Grid.Where(x => x.Column == i && x.Line > startTop && x.Line < finishBottom && x.Value == 1));                            
+
+                            foreach (var cell1 in Grid.Where(x => x.Column == i && x.Line <= startTop && x.Line >= lastFinishBottom && x.Value == 0))
                                 cell1.Value = -1;
 
-                            foreach (var cell1 in Grid.Where(x => x.Column == i && x.Line >= finishBottom && x.Value == 0))
-                                cell1.Value = -1;
+                            if (ColumnsClues[i].Length == 1 || currentClue == ColumnsClues[i].Length - 1) // só completa pra direita se não tem nenhum a direita
+                                foreach (var cell1 in Grid.Where(x => x.Column == i && x.Line >= finishBottom && x.Value == 0))
+                                    cell1.Value = -1;
+
+                            // se o que esta entre o inicio e o fim é exato o que esta na cola entao marca todos como pintados
+                            var cells = Grid.Where(x => x.Column == i && x.Line > startTop && x.Line < finishBottom && (x.Value == 0 || x.Value == 1));
+                            if (cells.Count() == clue)
+                                foreach (var cell2 in cells.Where(x => x.Value == 0))
+                                    cell2.Value = 1;
+
+                            lastFinishBottom = finishBottom;
+
                         }
-
+                        currentClue++;
                     }
                 }
                 #endregion
 
+                NextStep = 0;
             }
             //TODO: procura por espaços que nao é possivel inserir nenhum pintado e marca com X
             else if (NextStep == 3)
             {
-
-                //valida linhas
-                foreach (var cell in Grid.Where(x => x.Value == 1).OrderBy(x => x.Line))
-                {
-
-                }
 
             }
         }
