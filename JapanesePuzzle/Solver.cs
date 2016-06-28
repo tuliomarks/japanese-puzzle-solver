@@ -110,9 +110,14 @@ namespace JapanesePuzzle
             if (i >= LinesClues.Length)
             {
                 var ret = IsSolved();
-                //Console.Clear();
-                //Debug();
-
+                if (ret)
+                {
+                    Console.Clear();
+                    Debug();
+                    Console.Write(DateTime.Now.ToString());
+                    Console.ReadLine();    
+                }
+                
                 return ret;
             }
 
@@ -127,7 +132,9 @@ namespace JapanesePuzzle
                     cell.Value = 1;
                     solved = SolveBruteForce(i, j + 1);
                 }
-                cell.Value = 0;
+
+                if (!solved)
+                    cell.Value = 0;
                 return solved;
             }
 
@@ -156,10 +163,11 @@ namespace JapanesePuzzle
 
                         var length = (maxEnd - minStart) + 1;
                         var middle = length / 2;
-                        if (checks[0] < middle || middle <= 1) continue;
+                        if (checks[0] <= middle || middle <= 1) continue;
 
-                        var start = length + minStart - checks[0];
-                        for (int j = start; j < length - start; j++)
+                        var start = minStart + (length - checks[0]);
+                        var end = maxEnd - (length - checks[0]) + 1;
+                        for (int j = start; j < end; j++)
                         {
                             SetValue(i, j, 1);
                         }
@@ -181,10 +189,11 @@ namespace JapanesePuzzle
 
                         var length = (maxEnd - minStart) + 1;
                         var middle = length / 2;
-                        if (checks[0] < middle || middle <= 1) continue;
+                        if (checks[0] <= middle || middle <= 1) continue;
 
-                        var start = length + minStart - checks[0];
-                        for (int i = start; i < length - start; i++)
+                        var start = minStart + (length - checks[0]);
+                        var end = maxEnd - (length - checks[0]) + 1;
+                        for (int i = start; i < end; i++)
                         {
                             SetValue(i, j, 1);
                         }
