@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -11,6 +12,7 @@ namespace JapanesePuzzle
     {
 
         private List<Cell> Grid { get; set; }
+
         private int[][] LinesClues { get; set; }
         private int[][] ColumnsClues { get; set; }
 
@@ -18,9 +20,12 @@ namespace JapanesePuzzle
         private int LineSize = 0;
         private int ColumnSize = 0;
 
+        private bool HasChanges;
+        private int NoChanges = 0;
 
         public Solver(string arquivo)
         {
+
             if (!File.Exists(arquivo)) throw new FileNotFoundException();
 
             using (var sr = new StreamReader(new FileStream(arquivo, FileMode.Open)))
@@ -84,8 +89,54 @@ namespace JapanesePuzzle
             }
         }
 
+        public bool Solve()
+        {
+            while (NoChanges <= 15)
+            {
+                DoStep();
+            }
+            return IsSolved();
+        }
+
+        private int ct = 0;
+        public bool SolveBruteForce(int i, int j)
+        {
+            if (j >= ColumnsClues.Length)
+            {
+                i++;
+                j = 0;
+            }
+
+            if (i >= LinesClues.Length)
+            {
+                var ret = IsSolved();
+                //Console.Clear();
+                //Debug();
+
+                return ret;
+            }
+
+            //nao percorre o que esta preenchido
+            if (GetValue(i, j) == 0)
+            {
+                var cell = Grid.First(x => x.Line == i && x.Column == j);
+                cell.Value = -1;
+                var solved = SolveBruteForce(i, j + 1);
+                if (!solved)
+                {
+                    cell.Value = 1;
+                    solved = SolveBruteForce(i, j + 1);
+                }
+                cell.Value = 0;
+                return solved;
+            }
+
+            return SolveBruteForce(i, j + 1);
+        }
+
         public void DoStep()
         {
+            HasChanges = false;
 
             if (NextStep == 0)
             {
@@ -95,11 +146,20 @@ namespace JapanesePuzzle
                     var checks = LinesClues[i];
                     if (checks.Length == 1)
                     {
-                        var middle = LineSize / 2;
-                        if (checks[0] <= middle) continue;
+                        // nao passa pelas linhas ja preenchidas
+                        if (!Grid.Any(x => x.Line == i && x.Value == 0)) continue;
 
-                        var start = LineSize - checks[0];
-                        for (int j = start; j < LineSize - start; j++)
+                        var minStart = Grid.Where(x => x.Line == i && (x.Value == 0 || x.Value == 1)).Min(x => x.Column);
+                        var maxEnd = Grid.Where(x => x.Line == i && (x.Value == 0 || x.Value == 1)).Max(x => x.Column);
+
+                        if (Grid.Any(x => x.Line == i && x.Value == -1 && x.Column >= minStart && x.Column <= maxEnd)) continue;
+
+                        var length = (maxEnd - minStart) + 1;
+                        var middle = length / 2;
+                        if (checks[0] < middle || middle <= 1) continue;
+
+                        var start = length + minStart - checks[0];
+                        for (int j = start; j < length - start; j++)
                         {
                             SetValue(i, j, 1);
                         }
@@ -111,11 +171,20 @@ namespace JapanesePuzzle
                     var checks = ColumnsClues[j];
                     if (checks.Length == 1)
                     {
-                        var middle = ColumnSize / 2;
-                        if ((checks.Length != 1) || (checks[0] <= middle)) continue;
+                        // nao passa pelas colunas ja preenchidas
+                        if (!Grid.Any(x => x.Column == j && x.Value == 0)) continue;
 
-                        var start = ColumnSize - checks[0];
-                        for (int i = start; i < ColumnSize - start; i++)
+                        var minStart = Grid.Where(x => x.Column == j && (x.Value == 0 || x.Value == 1)).Min(x => x.Line);
+                        var maxEnd = Grid.Where(x => x.Column == j && (x.Value == 0 || x.Value == 1)).Max(x => x.Line);
+
+                        if (Grid.Any(x => x.Column == j && x.Value == -1 && x.Line >= minStart && x.Line <= maxEnd)) continue;
+
+                        var length = (maxEnd - minStart) + 1;
+                        var middle = length / 2;
+                        if (checks[0] < middle || middle <= 1) continue;
+
+                        var start = length + minStart - checks[0];
+                        for (int i = start; i < length - start; i++)
                         {
                             SetValue(i, j, 1);
                         }
@@ -130,7 +199,7 @@ namespace JapanesePuzzle
 
                 for (int i = 0; i < LinesClues.Length; i++)
                 {
-                    var sumLine = Grid.Where(x => x.Line == i).Sum(x => x.Value);
+                    var sumLine = Grid.Count(x => x.Line == i && x.Value == 1);
                     if (sumLine == 0) continue;
                     else if (sumLine == LinesClues[i].Sum()) // se já encontrou todos da linha marca com X
                     {
@@ -144,7 +213,7 @@ namespace JapanesePuzzle
 
                 for (int j = 0; j < ColumnsClues.Length; j++)
                 {
-                    var sumColumn = Grid.Where(x => x.Column == j).Sum(x => x.Value);
+                    var sumColumn = Grid.Count(x => x.Column == j && x.Value == 1);
                     if (sumColumn == 0) continue;
                     else if (sumColumn == ColumnsClues[j].Sum()) // se já encontrou todos da linha marca com X
                     {
@@ -165,9 +234,12 @@ namespace JapanesePuzzle
 
                 for (int i = 0; i < LinesClues.Length; i++)
                 {
+                    // nao passa pelas linhas ja preenchidas
+                    if (!Grid.Any(x => x.Line == i && x.Value == 0)) continue;
 
                     var paintedCells = Grid.Where(x => x.Line == i && x.Value == 1).ToArray();
                     var groups = 0;
+                    var dif = 0;
                     for (int j = 0; j < paintedCells.Count(); j++)
                     {
                         if (j == 0)
@@ -175,16 +247,17 @@ namespace JapanesePuzzle
                             groups++;
                             continue;
                         }
-                        if (paintedCells[j].Column - paintedCells[j-1].Column > 1)
+                        dif = paintedCells[j].Column - paintedCells[j - 1].Column;
+                        if (dif > 1 && !LinesClues[i].Any(x => x >= dif + 1))
                             groups++;
                     }
-                    if (LinesClues[i].Length != paintedCells.Count()) continue;
+                    if (LinesClues[i].Length != groups) continue;
 
                     var currentClue = 0;
                     var lastFinishRight = 0;
                     var removedCells = new List<Cell>();
                     foreach (var cell in paintedCells)
-                    {                        
+                    {
                         if (removedCells.Contains(cell)) continue;
 
                         var clue = LinesClues[i][currentClue];
@@ -196,7 +269,9 @@ namespace JapanesePuzzle
                             // se achou algum pintado entao nao eh ali que deve estar
                             var cells = Grid.Where(x => x.Line == i && x.Column < clue && x.Value == 0);
                             foreach (var cell1 in cells)
-                                cell1.Value = 1;                           
+                                SetValue(cell1.Line, cell1.Column, 1);
+
+                            removedCells.AddRange(Grid.Where(x => x.Line == i && x.Column < clue && x.Value == 1));
                         }
                         // se esta no final faz o mesmo teste para as colunas da esquerda
                         else if (cell.Column == LineSize - 1)
@@ -204,11 +279,13 @@ namespace JapanesePuzzle
                             // se achou algum pintado entao nao eh ali que deve estar
                             var cells = Grid.Where(x => x.Line == i && x.Column < LineSize - clue && x.Column >= lastFinishRight && x.Value == 0);
                             foreach (var cell1 in cells)
-                                cell1.Value = -1;
+                                SetValue(cell1.Line, cell1.Column, -1);
 
                             cells = Grid.Where(x => x.Line == i && x.Column >= LineSize - clue && x.Value == 0);
                             foreach (var cell1 in cells)
-                                cell1.Value = 1;
+                                SetValue(cell1.Line, cell1.Column, 1);
+
+                            removedCells.AddRange(Grid.Where(x => x.Line == i && x.Column >= LineSize - clue && x.Value == 1));
                         }
                         // se nao esta no inicio nem no fim, obrigatoriamente esta no meio
                         else
@@ -217,19 +294,19 @@ namespace JapanesePuzzle
                             var finishRight = cell.Column + clue;
 
                             // remove as celulas ja pintadas de dentro da faixa que pode chegar
-                            removedCells.AddRange(Grid.Where(x => x.Line == i && x.Column > startLeft && x.Column < finishRight && x.Value == 1));                            
+                            removedCells.AddRange(Grid.Where(x => x.Line == i && x.Column > startLeft && x.Column < finishRight && x.Value == 1));
 
                             foreach (var cell1 in Grid.Where(x => x.Line == i && x.Column <= startLeft && x.Column >= lastFinishRight && x.Value == 0))
-                                cell1.Value = -1;
+                                SetValue(cell1.Line, cell1.Column, -1);
 
                             if (LinesClues[i].Length == 1 || currentClue == LinesClues[i].Length - 1) // só completa pra direita se não tem nenhum a direita
-                                foreach (var cell1 in Grid.Where(x => x.Line == i && x.Column >= finishRight && x.Value == 0))
-                                    cell1.Value = -1;
+                                foreach (var cell1 in Grid.Where(x => x.Line == i && x.Column > finishRight && x.Value == 0))
+                                    SetValue(cell1.Line, cell1.Column, -1);
 
                             var cells = Grid.Where(x => x.Line == i && x.Column > startLeft && x.Column < finishRight && (x.Value == 0 || x.Value == 1));
                             if (cells.Count() == clue)
-                                foreach (var cell2 in cells.Where(x => x.Value == 0))
-                                    cell2.Value = 1;
+                                foreach (var cell1 in cells.Where(x => x.Value == 0))
+                                    SetValue(cell1.Line, cell1.Column, 1);
 
                             lastFinishRight = finishRight;
 
@@ -242,8 +319,12 @@ namespace JapanesePuzzle
                 for (int i = 0; i < ColumnsClues.Length; i++)
                 {
 
+                    // nao passa pelas colunas ja preenchidas
+                    if (!Grid.Any(x => x.Column == i && x.Value == 0)) continue;
+
                     var paintedCells = Grid.Where(x => x.Column == i && x.Value == 1).ToArray();
                     var groups = 0;
+                    var dif = 0;
                     for (int j = 0; j < paintedCells.Count(); j++)
                     {
                         if (j == 0)
@@ -251,7 +332,8 @@ namespace JapanesePuzzle
                             groups++;
                             continue;
                         }
-                        if (paintedCells[j].Line - paintedCells[j - 1].Line > 1)
+                        dif = paintedCells[j].Line - paintedCells[j - 1].Line;
+                        if (dif > 1 && !ColumnsClues[i].Any(x => x >= dif + 1))
                             groups++;
                     }
                     if (ColumnsClues[i].Length != groups) continue;
@@ -270,21 +352,26 @@ namespace JapanesePuzzle
                         if (cell.Line == 0)
                         {
                             // se achou algum pintado entao nao eh ali que deve estar
-                            var cells = Grid.Where(x => x.Column == i && x.Line < clue && x.Value == 0);
+                            var cells = Grid.Where(x => x.Column == i && x.Line < clue && x.Value == 0).ToList();
                             foreach (var cell1 in cells)
-                                cell1.Value = 1;
+                                SetValue(cell1.Line, cell1.Column, 1);
+
+                            removedCells.AddRange(Grid.Where(x => x.Column == i && x.Line < clue && x.Value == 1));
+
                         }
-                        // se esta no final faz o mesmo teste para as colunas da esquerda
+                        // se esta no final faz o mesmo teste para as colunas da cima
                         else if (cell.Line == ColumnSize - 1)
                         {
                             // se achou algum pintado entao nao eh ali que deve estar
                             var cells = Grid.Where(x => x.Column == i && x.Line < ColumnSize - clue && x.Line >= lastFinishBottom && x.Value == 0);
                             foreach (var cell1 in cells)
-                                cell1.Value = -1;
+                                SetValue(cell1.Line, cell1.Column, -1);
 
-                            cells = Grid.Where(x => x.Column == i && x.Line >= ColumnSize - clue && x.Value == 0);
+                            cells = Grid.Where(x => x.Column == i && x.Line >= ColumnSize - clue && x.Value == 0).ToList();
                             foreach (var cell1 in cells)
-                                cell1.Value = 1;
+                                SetValue(cell1.Line, cell1.Column, 1);
+
+                            removedCells.AddRange(Grid.Where(x => x.Column == i && x.Line >= ColumnSize - clue && x.Value == 1));
                         }
                         // se nao esta no inicio nem no fim, obrigatoriamente esta no meio
                         else
@@ -293,20 +380,20 @@ namespace JapanesePuzzle
                             var finishBottom = cell.Line + clue;
 
                             // remove as celulas ja pintadas de dentro da faixa que pode chegar
-                            removedCells.AddRange(Grid.Where(x => x.Column == i && x.Line > startTop && x.Line < finishBottom && x.Value == 1));                            
+                            removedCells.AddRange(Grid.Where(x => x.Column == i && x.Line > startTop && x.Line < finishBottom && x.Value == 1));
 
                             foreach (var cell1 in Grid.Where(x => x.Column == i && x.Line <= startTop && x.Line >= lastFinishBottom && x.Value == 0))
-                                cell1.Value = -1;
+                                SetValue(cell1.Line, cell1.Column, -1);
 
                             if (ColumnsClues[i].Length == 1 || currentClue == ColumnsClues[i].Length - 1) // só completa pra direita se não tem nenhum a direita
-                                foreach (var cell1 in Grid.Where(x => x.Column == i && x.Line >= finishBottom && x.Value == 0))
-                                    cell1.Value = -1;
+                                foreach (var cell1 in Grid.Where(x => x.Column == i && x.Line > finishBottom && x.Value == 0))
+                                    SetValue(cell1.Line, cell1.Column, -1);
 
                             // se o que esta entre o inicio e o fim é exato o que esta na cola entao marca todos como pintados
                             var cells = Grid.Where(x => x.Column == i && x.Line > startTop && x.Line < finishBottom && (x.Value == 0 || x.Value == 1));
                             if (cells.Count() == clue)
-                                foreach (var cell2 in cells.Where(x => x.Value == 0))
-                                    cell2.Value = 1;
+                                foreach (var cell1 in cells.Where(x => x.Value == 0))
+                                    SetValue(cell1.Line, cell1.Column, 1);
 
                             lastFinishBottom = finishBottom;
 
@@ -315,14 +402,374 @@ namespace JapanesePuzzle
                     }
                 }
                 #endregion
-
-                NextStep = 0;
+                NextStep = 3;
             }
-            //TODO: procura por espaços que nao é possivel inserir nenhum pintado e marca com X
+
             else if (NextStep == 3)
             {
+                #region Verifica os preenchidos nas bordas e preenche se possivel
+
+                // borda esquerda
+                var paintedCells = Grid.Where(x => x.Column == 0 && x.Value == 1);
+                foreach (var cell in paintedCells)
+                {
+
+                    if (!Grid.Any(x => x.Line == cell.Line && x.Value == 0)) continue;
+
+                    var clue = LinesClues[cell.Line];
+                    var valueClue = clue[0];
+
+                    var found = false;
+                    foreach (var cell1 in Grid.Where(x => x.Line == cell.Line && x.Column < valueClue && (x.Value == 0 || x.Value == 1)))
+                    {
+                        found = true;
+                        SetValue(cell1.Line, cell1.Column, 1);
+                    }
+
+                    // a proxima é obrigatoriamente um intervalo
+                    if (found)
+                        SetValue(cell.Line, cell.Column + valueClue, -1);
+                }
+
+                // borda superior
+                paintedCells = Grid.Where(x => x.Line == 0 && x.Value == 1);
+                foreach (var cell in paintedCells)
+                {
+                    if (!Grid.Any(x => x.Column == cell.Column && x.Value == 0)) continue;
+
+                    var clue = ColumnsClues[cell.Column];
+                    var valueClue = clue[0];
+
+                    var found = false;
+                    foreach (var cell1 in Grid.Where(x => x.Column == cell.Column && x.Line < valueClue && (x.Value == 0 || x.Value == 1)))
+                    {
+                        found = true;
+                        SetValue(cell1.Line, cell1.Column, 1);
+                    }
+
+                    // a proxima é obrigatoriamente um intervalo
+                    if (found)
+                        SetValue(cell.Line + valueClue, cell.Column, -1);
+                }
+
+                // borda direita
+                paintedCells = Grid.Where(x => x.Column == LineSize - 1 && x.Value == 1);
+                foreach (var cell in paintedCells)
+                {
+                    if (!Grid.Any(x => x.Line == cell.Line && x.Value == 0)) continue;
+
+                    var clue = LinesClues[cell.Line];
+                    var valueClue = clue[clue.Length - 1];
+
+                    var found = false;
+                    foreach (var cell1 in Grid.Where(x => x.Line == cell.Line && x.Column >= LineSize - valueClue && (x.Value == 0 || x.Value == 1)))
+                    {
+                        found = true;
+                        SetValue(cell1.Line, cell1.Column, 1);
+                    }
+
+                    // a proxima é obrigatoriamente um intervalo
+                    if (found)
+                        SetValue(cell.Line, cell.Column - valueClue, -1);
+                }
+
+                // borda superior
+                paintedCells = Grid.Where(x => x.Line == ColumnSize - 1 && x.Value == 1);
+                foreach (var cell in paintedCells)
+                {
+
+                    if (!Grid.Any(x => x.Column == cell.Column && x.Value == 0)) continue;
+
+                    var clue = ColumnsClues[cell.Column];
+                    var valueClue = clue[clue.Length - 1];
+
+                    var found = false;
+                    foreach (var cell1 in Grid.Where(x => x.Column == cell.Column && x.Line >= ColumnSize - valueClue && (x.Value == 0 || x.Value == 1)))
+                    {
+                        found = true;
+                        SetValue(cell1.Line, cell1.Column, 1);
+                    }
+
+                    // a proxima é obrigatoriamente um intervalo
+                    if (found)
+                        SetValue(cell.Line - valueClue, cell.Column, -1);
+                }
+
+                #endregion
+                NextStep = 4;
+            }
+            else if (NextStep == 4)
+            {
+                #region Procura por espaços que nao é possivel inserir nenhum pintado e marca com X
+                for (int i = 0; i < LinesClues.Length; i++)
+                {
+                    // nao passa pelas linhas ja preenchidas
+                    if (!Grid.Any(x => x.Line == i && x.Value == 0)) continue;
+
+                    var maxClue = LinesClues[i].Max(x => x);
+                    var minClue = LinesClues[i].Min(x => x);
+                    if (maxClue == 1) continue;
+
+                    // busca os espaços em branco
+                    var pointer = 0;
+                    var cluePointer = 0;
+                    var start = 0;
+                    var hasOne = false;
+                    var last = false;
+
+                    while (!last)
+                    {
+                        var value = 0;
+                        if (pointer < ColumnsClues.Length)
+                        {
+                            value = GetValue(i, pointer);
+                        }
+                        else
+                        {
+                            last = true;
+                        }
+
+                        if ((value == 0 || value == 1) && !last)
+                        {
+                            if (value == 1)
+                                hasOne = true;
+                            pointer++;
+                        }
+                        else
+                        {
+                            if (!hasOne)
+                            {
+                                // nenhuma cola cabe no espaco
+                                if (pointer - start > 0 && pointer - start < maxClue && pointer - start < minClue)
+                                {
+                                    for (int k = start; k < pointer; k++)
+                                        SetValue(i, k, -1);
+                                }
+
+                                if (cluePointer < LinesClues[i].Length)
+                                {
+                                    // se aquele espaço pode preencher uma cola na sequencia e só cabe nesse ponto 
+                                    if (pointer - start >= LinesClues[i][cluePointer] &&
+                                        // se a soma das posicoes não permite que essa cola e as demais caibam em outra posicao                                       
+                                        Grid.Count(x => x.Line == i && x.Column > pointer && (x.Value == 0 || x.Value == 1)) <
+                                        LinesClues[i].Where(x => x >= cluePointer).Sum(x => x) + LinesClues[i].Count(x => x >= cluePointer) - 1 &&
+                                        // se a soma das posicoes anteriores não permite que essa cola e as demais caibam em outra posicao
+                                        Grid.Count(x => x.Line == i && x.Column < start && (x.Value == 0 || x.Value == 1)) <
+                                        LinesClues[i].Where(x => x <= cluePointer).Sum(x => x) + LinesClues[i].Count(x => x >= cluePointer) - 1)
+                                    {
+
+                                        var startPaint = 0;
+                                        var endPaint = 0;
+                                        var length = (pointer - start);
+                                        if (length == LinesClues[i][cluePointer])
+                                        {
+                                            startPaint = start;
+                                            endPaint = startPaint + length;
+                                        }
+                                        else
+                                        {
+                                            var middle = length / 2;
+                                            if (LinesClues[i][cluePointer] <= middle || middle <= 1)
+                                            {
+                                                startPaint = -1;
+                                            }
+                                            else
+                                            {
+                                                startPaint = length + start - LinesClues[i][cluePointer];
+                                                endPaint = length - startPaint;
+                                            }
+
+                                        }
+
+                                        if (startPaint >= 0)
+                                            for (int k = startPaint; k < endPaint; k++)
+                                                SetValue(i, k, 1);
+
+                                        cluePointer++;
+                                    }
+                                }
+                            }
+                            hasOne = false;
+                            pointer++;
+                            start = pointer;
+                        }
+                    }
+                }
+
+                for (int j = 0; j < ColumnsClues.Length; j++)
+                {
+                    // nao passa pelas linhas ja preenchidas
+                    if (!Grid.Any(x => x.Column == j && x.Value == 0)) continue;
+
+                    var maxClue = ColumnsClues[j].Max(x => x);
+                    var minClue = ColumnsClues[j].Min(x => x);
+                    if (maxClue == 1) continue;
+
+                    // busca os espaços em branco
+                    var pointer = 0;
+                    var cluePointer = 0;
+                    var start = 0;
+                    var hasOne = false;
+                    var last = false;
+
+                    while (!last)
+                    {
+                        var value = 0;
+                        if (pointer < LinesClues.Length)
+                        {
+                            value = GetValue(pointer, j);
+                        }
+                        else
+                        {
+                            last = true;
+                        }
+
+                        if ((value == 0 || value == 1) && !last)
+                        {
+                            if (value == 1)
+                                hasOne = true;
+                            pointer++;
+                        }
+                        else
+                        {
+                            if (!hasOne)
+                            {
+                                if (pointer - start > 0 && pointer - start < maxClue && pointer - start < minClue)
+                                {
+                                    for (int k = start; k < pointer; k++)
+                                        SetValue(k, j, -1);
+                                }
+
+                                if (cluePointer < ColumnsClues[j].Length)
+                                {
+                                    // se aquele espaço pode preencher uma cola na sequencia e só cabe nesse ponto 
+                                    if (pointer - start >= ColumnsClues[j][cluePointer] &&
+                                        // se a soma das posicoes posteriores não permite que essa cola e as demais caibam em outra posicao
+                                        Grid.Count(x => x.Column == j && x.Line > pointer && (x.Value == 0 || x.Value == 1)) <
+                                        ColumnsClues[j].Where(x => x >= cluePointer).Sum(x => x) + ColumnsClues[j].Count(x => x >= cluePointer) - 1 &&
+                                        // se a soma das posicoes anteriores não permite que essa cola e as demais caibam em outra posicao
+                                        Grid.Count(x => x.Column == j && x.Line < start && (x.Value == 0 || x.Value == 1)) <
+                                        ColumnsClues[j].Where(x => x <= cluePointer).Sum(x => x) + ColumnsClues[j].Count(x => x >= cluePointer) - 1)
+                                    {
+
+                                        var startPaint = 0;
+                                        var endPaint = 0;
+                                        var length = (pointer - start);
+                                        if (length == ColumnsClues[j][cluePointer])
+                                        {
+                                            startPaint = start;
+                                            endPaint = startPaint + length;
+                                        }
+                                        else
+                                        {
+                                            var middle = length / 2;
+                                            if (ColumnsClues[j][cluePointer] <= middle || middle <= 1)
+                                            {
+                                                startPaint = -1;
+                                            }
+                                            else
+                                            {
+                                                startPaint = length + start - ColumnsClues[j][cluePointer];
+                                                endPaint = length - startPaint;
+                                            }
+                                        }
+
+                                        if (startPaint >= 0)
+                                            for (int k = startPaint; k < endPaint; k++)
+                                                SetValue(k, j, 1);
+
+                                        cluePointer++;
+                                    }
+                                }
+
+                            }
+                            hasOne = false;
+                            pointer++;
+                            start = pointer;
+                        }
+                    }
+                }
+                #endregion
+                NextStep = 0;
+            }
+
+            if (HasChanges)
+                NoChanges = 0;
+            else
+                NoChanges++;
+
+        }
+
+        public bool IsSolved()
+        {
+            for (int i = 0; i < LinesClues.Length; i++)
+            {
+                if (Grid.Any(x => x.Line == i && x.Value == 0))
+                    return false;
+
+                var cluePointer = 0;
+                var pointer = -1;
+                while (cluePointer < LinesClues[i].Length)
+                {
+
+                    var clueValue = LinesClues[i][cluePointer];
+
+                    var next = Grid.FirstOrDefault(x => x.Line == i && x.Column > pointer && x.Value == 1);
+
+                    var aux = 0;
+                    if (next == null && clueValue != 0) return false;
+                    else if (next != null) aux = next.Column;
+                    else aux = 0;
+
+                    var nextWhiteSpace = Grid.FirstOrDefault(x => x.Line == i && x.Column > aux && x.Value == -1);
+                    var aux2 = 0;
+                    if (nextWhiteSpace != null) aux2 = nextWhiteSpace.Column;
+                    else aux2 = LineSize;
+
+                    var count = Grid.Count(x => x.Line == i && x.Column >= aux && x.Column < aux2 && x.Value == 1);
+
+                    pointer = aux2;
+
+                    if (count != clueValue) return false;
+
+                    cluePointer++;
+                }
 
             }
+
+            for (int j = 0; j < ColumnsClues.Length; j++)
+            {
+                if (Grid.Any(x => x.Column == j && x.Value == 0))
+                    return false;
+
+                var cluePointer = 0;
+                var pointer = -1;
+                while (cluePointer < ColumnsClues[j].Length)
+                {
+
+                    var clueValue = ColumnsClues[j][cluePointer];
+                    var next = Grid.FirstOrDefault(x => x.Column == j && x.Line > pointer && x.Value == 1);
+
+                    var aux = 0;
+                    if (next == null && clueValue != 0) return false;
+                    else if (next != null) aux = next.Line;
+                    else aux = 0;
+
+                    var nextWhiteSpace = Grid.FirstOrDefault(x => x.Column == j && x.Line > aux && x.Value == -1);
+                    var aux2 = 0;
+                    if (nextWhiteSpace != null) aux2 = nextWhiteSpace.Line;
+                    else aux2 = ColumnSize;
+
+                    var count = Grid.Count(x => x.Column == j && x.Line >= aux && x.Line < aux2 && x.Value == 1);
+                    pointer = aux2;
+
+                    if (count != clueValue) return false;
+
+                    cluePointer++;
+                }
+            }
+
+            return true;
         }
 
         private int GetValue(int line, int column)
@@ -332,12 +779,15 @@ namespace JapanesePuzzle
 
         private void SetValue(int line, int column, int value)
         {
-            Grid.First(x => x.Line == line && x.Column == column).Value = value;
+            var cell = Grid.First(x => x.Line == line && x.Column == column);
+            if (cell.Value == 0)
+                HasChanges = true;
+            cell.Value = value;
         }
 
         public string Debug()
         {
-
+            var e = Encoding.GetEncoding("iso-8859-1");
             var ret = string.Empty;
             Console.ForegroundColor = ConsoleColor.Red;
             Console.Write("   ");
@@ -358,9 +808,13 @@ namespace JapanesePuzzle
                     if (GetValue(i, j) == 0)
                         Console.Write("   ");
                     else if (GetValue(i, j) == 1)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Green;
                         Console.Write("  #");
+                        Console.ResetColor();
+                    }
                     else if (GetValue(i, j) == -1)
-                        Console.Write("  X");
+                        Console.Write("  .");
                 }
                 Console.Write("\n");
             }
