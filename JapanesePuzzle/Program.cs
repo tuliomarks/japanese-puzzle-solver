@@ -30,11 +30,21 @@ namespace JapanesePuzzle
                     var bruteForce = Console.ReadLine();
 
                     if (bruteForce == "S" || bruteForce == "s")
-                        res = solver.SolveBruteForce(0, 0);                        
+                    {
+                        solver.PrepareBruteForce();
+                        res = solver.SolveBruteForce(0, 0);
+
+                        Console.Clear();
+                        solver.DebugBruteForce();
+                    }
+                        
+                }
+                else
+                {
+                    Console.Clear();
+                    solver.Debug();
                 }
 
-                Console.Clear();
-                solver.Debug();
                 if (res)
                     Console.WriteLine("Resolvido!!!");
                 else

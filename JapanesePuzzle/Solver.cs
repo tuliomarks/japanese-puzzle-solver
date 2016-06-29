@@ -12,9 +12,12 @@ namespace JapanesePuzzle
     {
 
         private List<Cell> Grid { get; set; }
+        private int[,] BruteGrid;
+        private int[] BruteLineClueSum;
+        private int[] BruteColumnClueSum;
 
-        private int[][] LinesClues { get; set; }
-        private int[][] ColumnsClues { get; set; }
+        private int[][] LinesClues;
+        private int[][] ColumnsClues;
 
         private int NextStep = 0;
         private int LineSize = 0;
@@ -98,43 +101,96 @@ namespace JapanesePuzzle
             return IsSolved();
         }
 
-        private int ct = 0;
+        private DateTime TimeStartDebug;
+        private DateTime TimeStart;
+
+        public void PrepareBruteForce()
+        {
+            BruteGrid = new int[ColumnSize, LineSize];
+            foreach (var cell in Grid)
+            {
+                BruteGrid[cell.Line, cell.Column] = cell.Value;
+            }
+
+            BruteLineClueSum = new int[ColumnSize];
+            for (int i = 0; i < ColumnSize; i++)
+            {
+                BruteLineClueSum[i] = LinesClues[i].Sum(x => x);
+            }
+
+            BruteColumnClueSum = new int[LineSize];
+            for (int i = 0; i < LineSize; i++)
+            {
+                BruteColumnClueSum[i] = ColumnsClues[i].Sum(x => x);
+            }
+            TimeStart = DateTime.Now;
+            TimeStartDebug = DateTime.Now;
+        }
+
         public bool SolveBruteForce(int i, int j)
         {
             if (j >= ColumnsClues.Length)
             {
+                // faz a validação da linha se a mesma esta com q soma das pistas erradas entao ja ignora toda a arvore abaixo.
+                //var sumClues = LinesClues[i].Sum(x => x);
+                //var sumLine = Grid.Where(x => x.Line == i && x.Value == 1).Sum(x => x.Value);
+                //if (sumLine != sumClues)
+                //    return false;
+
+                //var sumLine = Grid.Where(x => x.Line == i && x.Value == 1).Sum(x => x.Value);
+                var sumLine = 0;
+                for (int k = 0; k < ColumnsClues.Length; k++)
+                {
+                    if (BruteGrid[i, k] > 0)
+                        sumLine += BruteGrid[i, k];
+                }
+                if (sumLine != BruteLineClueSum[i])
+                    return false;
+
                 i++;
                 j = 0;
             }
 
             if (i >= LinesClues.Length)
             {
-                var ret = IsSolved();
-                if (ret)
+                /*if ((DateTime.Now - TimeStartDebug).TotalSeconds > 1)
                 {
+                    TimeStartDebug = DateTime.Now;
                     Console.Clear();
-                    Debug();
-                    Console.Write(DateTime.Now.ToString());
-                    Console.ReadLine();    
-                }
-                
+                    DebugBruteForce();
+                    //Console.Write(DateTime.Now.ToString());
+                    //Console.ReadLine();    
+                }*/
+
+                var ret = IsSolvedBruteForce();
                 return ret;
             }
 
             //nao percorre o que esta preenchido
-            if (GetValue(i, j) == 0)
+            //if (GetValue(i, j) == 0)
+            if (BruteGrid[i, j] == 0)
             {
-                var cell = Grid.First(x => x.Line == i && x.Column == j);
-                cell.Value = -1;
+
+                if (i > BruteColumnClueSum[j])
+
+
+                //var cell = Grid.First(x => x.Line == i && x.Column == j);
+                BruteGrid[i, j] = -1;
+                //cell.Value = -1;
                 var solved = SolveBruteForce(i, j + 1);
                 if (!solved)
                 {
-                    cell.Value = 1;
+                    //cell.Value = 1;
+                    BruteGrid[i, j] = 1;
                     solved = SolveBruteForce(i, j + 1);
                 }
 
                 if (!solved)
-                    cell.Value = 0;
+                {
+                    //cell.Value = 0;
+                    BruteGrid[i, j] = 0;
+                }
+
                 return solved;
             }
 
@@ -781,6 +837,112 @@ namespace JapanesePuzzle
             return true;
         }
 
+        public bool IsSolvedBruteForce()
+        {
+            for (int i = 0; i < LinesClues.Length; i++)
+            {
+                for (int j = 0; j < ColumnsClues.Length; j++)
+                    if (BruteGrid[i, j] == 0) return false;
+
+                var cluePointer = 0;
+                var pointer = -1;
+                while (cluePointer < LinesClues[i].Length)
+                {
+
+                    var clueValue = LinesClues[i][cluePointer];
+                    var next = -1;
+
+                    for (int j = pointer + 1; j < ColumnsClues.Length; j++)
+                    {
+                        if (BruteGrid[i, j] == 1)
+                        {
+                            next = j;
+                            break;
+                        }
+                    }
+                    if (next == -1 && clueValue != 0) return false;
+
+                    var nextWhiteSpace = -1;
+                    for (int j = next + 1; j < ColumnsClues.Length; j++)
+                    {
+                        if (BruteGrid[i, j] == -1)
+                        {
+                            nextWhiteSpace = j;
+                            break;
+                        }
+                    }
+
+                    if (nextWhiteSpace == -1) nextWhiteSpace = LineSize;
+
+                    var count = 0;
+                    for (int j = next; j < nextWhiteSpace ; j++)
+                    {
+                        if (BruteGrid[i, j] == 1)
+                            count++;
+                    }
+
+                    pointer = nextWhiteSpace;
+
+                    if (count != clueValue) return false;
+
+                    cluePointer++;
+                }
+
+            }
+
+            for (int j = 0; j < ColumnsClues.Length; j++)
+            {
+                for (int i = 0; i < LinesClues.Length; i++)
+                    if (BruteGrid[i, j] == 0) return false;
+
+                var cluePointer = 0;
+                var pointer = -1;
+                while (cluePointer < ColumnsClues[j].Length)
+                {
+
+                    var clueValue = ColumnsClues[j][cluePointer];
+                    var next = -1;
+
+                    for (int i = pointer + 1; i < LinesClues.Length; i++)
+                    {
+                        if (BruteGrid[i, j] == 1)
+                        {
+                            next = i;
+                            break;
+                        }
+                    }
+                    if (next == -1 && clueValue != 0) return false;
+
+                    var nextWhiteSpace = -1;
+                    for (int i = next + 1; i < LinesClues.Length; i++)
+                    {
+                        if (BruteGrid[i, j] == -1)
+                        {
+                            nextWhiteSpace = i;
+                            break;
+                        }
+                    }
+
+                    if (nextWhiteSpace == -1) nextWhiteSpace = ColumnSize;
+
+                    var count = 0;
+                    for (int i = next; i < nextWhiteSpace; i++)
+                    {
+                        if (BruteGrid[i, j] == 1)
+                            count++;
+                    }
+
+                    pointer = nextWhiteSpace;
+
+                    if (count != clueValue) return false;
+
+                    cluePointer++;
+                }
+            }
+
+            return true;
+        }
+
         private int GetValue(int line, int column)
         {
             return Grid.First(x => x.Line == line && x.Column == column).Value;
@@ -827,6 +989,44 @@ namespace JapanesePuzzle
                 }
                 Console.Write("\n");
             }
+            return ret;
+        }
+
+        public string DebugBruteForce()
+        {
+            var e = Encoding.GetEncoding("iso-8859-1");
+            var ret = string.Empty;
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.Write("   ");
+            for (int j = 0; j < ColumnsClues.Length; j++)
+            {
+                Console.Write("{0}", j.ToString().PadLeft(3));
+            }
+            Console.ResetColor();
+            Console.Write("\n");
+
+            for (int i = 0; i < LinesClues.Length; i++)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.Write("{0}", i.ToString().PadLeft(3));
+                Console.ResetColor();
+                for (int j = 0; j < ColumnsClues.Length; j++)
+                {
+                    if (BruteGrid[i, j] == 0)
+                        Console.Write("   ");
+                    else if (BruteGrid[i, j] == 1)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.Write("  #");
+                        Console.ResetColor();
+                    }
+                    else if (BruteGrid[i, j] == -1)
+                        Console.Write("  .");
+                }
+                Console.Write("\n");
+            }
+            Console.WriteLine((DateTime.Now - TimeStart).ToString());
+
             return ret;
         }
     }
