@@ -132,12 +132,6 @@ namespace JapanesePuzzle
             if (j >= ColumnsClues.Length)
             {
                 // faz a validação da linha se a mesma esta com q soma das pistas erradas entao ja ignora toda a arvore abaixo.
-                //var sumClues = LinesClues[i].Sum(x => x);
-                //var sumLine = Grid.Where(x => x.Line == i && x.Value == 1).Sum(x => x.Value);
-                //if (sumLine != sumClues)
-                //    return false;
-
-                //var sumLine = Grid.Where(x => x.Line == i && x.Value == 1).Sum(x => x.Value);
                 var sumLine = 0;
                 for (int k = 0; k < ColumnsClues.Length; k++)
                 {
@@ -167,27 +161,21 @@ namespace JapanesePuzzle
             }
 
             //nao percorre o que esta preenchido
-            //if (GetValue(i, j) == 0)
             if (BruteGrid[i, j] == 0)
             {
 
                 if (i > BruteColumnClueSum[j])
 
-
-                //var cell = Grid.First(x => x.Line == i && x.Column == j);
                 BruteGrid[i, j] = -1;
-                //cell.Value = -1;
                 var solved = SolveBruteForce(i, j + 1);
                 if (!solved)
                 {
-                    //cell.Value = 1;
                     BruteGrid[i, j] = 1;
                     solved = SolveBruteForce(i, j + 1);
                 }
 
                 if (!solved)
                 {
-                    //cell.Value = 0;
                     BruteGrid[i, j] = 0;
                 }
 
