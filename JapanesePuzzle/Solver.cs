@@ -12,9 +12,8 @@ namespace JapanesePuzzle
     {
 
         private List<Cell> Grid { get; set; }
-        private int[,] BruteGrid;
-        private int[] BruteLineClueSum;
-        private int[] BruteColumnClueSum;
+        public int[,] BruteGrid;
+        public string[][] ValidLines;
 
         private int[][] LinesClues;
         private int[][] ColumnsClues;
@@ -112,7 +111,7 @@ namespace JapanesePuzzle
                 BruteGrid[cell.Line, cell.Column] = cell.Value;
             }
 
-            BruteLineClueSum = new int[ColumnSize];
+            /*BruteLineClueSum = new int[ColumnSize];
             for (int i = 0; i < ColumnSize; i++)
             {
                 BruteLineClueSum[i] = LinesClues[i].Sum(x => x);
@@ -122,67 +121,117 @@ namespace JapanesePuzzle
             for (int i = 0; i < LineSize; i++)
             {
                 BruteColumnClueSum[i] = ColumnsClues[i].Sum(x => x);
+            }*/
+
+            ValidLines = new string[ColumnSize][];
+            for (int i = 0; i < ColumnSize; i++)
+            {
+                var list = new List<string>();
+                DoPermutation(list, i, 0, string.Empty);
+                ValidLines[i] = list.ToArray();
             }
+
             TimeStart = DateTime.Now;
             TimeStartDebug = DateTime.Now;
         }
 
-        public bool SolveBruteForce(int i, int j)
+        public bool SolveBruteForce(int[,] grid, int i)
+        {
+            // se chegou ao fim das linhas verifica se a solução é valida
+            // i inicia com 0
+            if (i >= LinesClues.Length)
+                return IsSolvedBruteForce();
+
+
+            // gera permutações para cada linha 
+            var result = false;
+
+            for (int x = 0; x < ValidLines[i].Length && !result; x++)
+            {
+                var checkLine = ValidLines[i][x];
+
+                for (int j = 0; j < checkLine.Length; j++)
+                {
+                    grid[i, j] = checkLine[j] == '0' ? -1 : 1;
+                }
+
+                if (IsPossibleColumnClues(grid, i))
+                {
+                    if ((DateTime.Now - TimeStartDebug).TotalSeconds > 5)
+                    {
+                        TimeStartDebug = DateTime.Now;
+                        Console.Clear();
+                        DebugBruteForce();
+                        //Console.ReadLine();
+                    }
+                    result = SolveBruteForce(grid, i + 1);
+                }
+                    
+
+                
+            }
+
+            return result;
+        }
+
+        private bool IsPossibleColumnClues(int[,] grid, int i)
+        {
+
+            //pega a primeira coluna e valida se é possivel pelas colas
+            for (int j = 0; j < ColumnsClues.Length; j++)
+            {
+                var check = String.Empty;
+                var count = 0;
+                for (int k = 0; k < i + 1; k++)
+                {
+                    if (grid[k, j] == -1)
+                    {
+                        check += '0';
+                    }
+                    else
+                    {
+                        check += '1';
+                        count++;
+                    }                    
+                }
+
+                var combinations = check.Split(new[] { "0" }, StringSplitOptions.RemoveEmptyEntries);
+                // se tem mais celulas pintadas intercaladas do que esta na pista é porque não é 
+                if (combinations.Length > ColumnsClues[j].Length) return false;
+
+                for (int k = 0; k < combinations.Length; k++)
+                {
+                    if (combinations[k].Length > ColumnsClues[j][k]) return false;
+                }
+
+            }
+
+            return true;
+        }
+
+        private void DoPermutation(List<string> permutations, int i, int j, string current)
         {
             if (j >= ColumnsClues.Length)
             {
-                // faz a validação da linha se a mesma esta com q soma das pistas erradas entao ja ignora toda a arvore abaixo.
-                var sumLine = 0;
-                for (int k = 0; k < ColumnsClues.Length; k++)
+                // valida se é valido comparado com as pistas
+                var combinations = current.Split(new[] { "0" }, StringSplitOptions.RemoveEmptyEntries);
+                if (combinations.Length != LinesClues[i].Length) return;
+
+                for (int k = 0; k < LinesClues[i].Length; k++)
                 {
-                    if (BruteGrid[i, k] > 0)
-                        sumLine += BruteGrid[i, k];
-                }
-                if (sumLine != BruteLineClueSum[i])
-                    return false;
-
-                i++;
-                j = 0;
-            }
-
-            if (i >= LinesClues.Length)
-            {
-                /*if ((DateTime.Now - TimeStartDebug).TotalSeconds > 1)
-                {
-                    TimeStartDebug = DateTime.Now;
-                    Console.Clear();
-                    DebugBruteForce();
-                    //Console.Write(DateTime.Now.ToString());
-                    //Console.ReadLine();    
-                }*/
-
-                var ret = IsSolvedBruteForce();
-                return ret;
-            }
-
-            //nao percorre o que esta preenchido
-            if (BruteGrid[i, j] == 0)
-            {
-
-                if (i > BruteColumnClueSum[j])
-
-                BruteGrid[i, j] = -1;
-                var solved = SolveBruteForce(i, j + 1);
-                if (!solved)
-                {
-                    BruteGrid[i, j] = 1;
-                    solved = SolveBruteForce(i, j + 1);
+                    if (combinations[k].Length != LinesClues[i][k]) return;
                 }
 
-                if (!solved)
-                {
-                    BruteGrid[i, j] = 0;
-                }
-
-                return solved;
+                permutations.Add(current);
+                return;
             }
 
-            return SolveBruteForce(i, j + 1);
+            // se nao esta pintado
+            DoPermutation(permutations, i, j + 1, string.Format("{0}0", current));
+
+            // se esta pintado
+            DoPermutation(permutations, i, j + 1, string.Format("{0}1", current));
+
         }
 
         public void DoStep()
@@ -863,7 +912,7 @@ namespace JapanesePuzzle
                     if (nextWhiteSpace == -1) nextWhiteSpace = LineSize;
 
                     var count = 0;
-                    for (int j = next; j < nextWhiteSpace ; j++)
+                    for (int j = next; j < nextWhiteSpace; j++)
                     {
                         if (BruteGrid[i, j] == 1)
                             count++;

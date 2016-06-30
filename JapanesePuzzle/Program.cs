@@ -32,7 +32,7 @@ namespace JapanesePuzzle
                     if (bruteForce == "S" || bruteForce == "s")
                     {
                         solver.PrepareBruteForce();
-                        res = solver.SolveBruteForce(0, 0);
+                        res = solver.SolveBruteForce(solver.BruteGrid, 0);
 
                         Console.Clear();
                         solver.DebugBruteForce();
