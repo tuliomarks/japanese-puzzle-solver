@@ -35,7 +35,7 @@ namespace JapanesePuzzle
                         res = solver.SolveBruteForce(solver.BruteGrid, 0);
 
                         Console.Clear();
-                        solver.DebugBruteForce();
+                        solver.DebugBruteForce(solver.BruteGrid);
                     }
                         
                 }

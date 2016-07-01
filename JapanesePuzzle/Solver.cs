@@ -108,7 +108,7 @@ namespace JapanesePuzzle
             BruteGrid = new int[ColumnSize, LineSize];
             foreach (var cell in Grid)
             {
-                BruteGrid[cell.Line, cell.Column] = cell.Value;
+                BruteGrid[cell.Line, cell.Column] = 0;
             }
 
             /*BruteLineClueSum = new int[ColumnSize];
@@ -157,18 +157,15 @@ namespace JapanesePuzzle
 
                 if (IsPossibleColumnClues(grid, i))
                 {
-                    if ((DateTime.Now - TimeStartDebug).TotalSeconds > 5)
+                    if ((DateTime.Now - TimeStartDebug).TotalSeconds > 1)
                     {
                         TimeStartDebug = DateTime.Now;
                         Console.Clear();
-                        DebugBruteForce();
+                        DebugBruteForce(grid);
                         //Console.ReadLine();
                     }
                     result = SolveBruteForce(grid, i + 1);
                 }
-                    
-
-                
             }
 
             return result;
@@ -181,18 +178,16 @@ namespace JapanesePuzzle
             for (int j = 0; j < ColumnsClues.Length; j++)
             {
                 var check = String.Empty;
-                var count = 0;
                 for (int k = 0; k < i + 1; k++)
                 {
-                    if (grid[k, j] == -1)
+                    if (grid[k, j] == 1)
                     {
-                        check += '0';
+                        check += '1';
                     }
                     else
                     {
-                        check += '1';
-                        count++;
-                    }                    
+                        check += '0';
+                    }
                 }
 
                 var combinations = check.Split(new[] { "0" }, StringSplitOptions.RemoveEmptyEntries);
@@ -201,7 +196,11 @@ namespace JapanesePuzzle
 
                 for (int k = 0; k < combinations.Length; k++)
                 {
-                    if (combinations[k].Length > ColumnsClues[j][k]) return false;
+                    if (!(combinations[k].Length == ColumnsClues[j][k] && combinations.Length > 1) &&
+                        !(combinations[k].Length <= ColumnsClues[j][k] && k != combinations.Length - 1))
+                        return false;
+                    
+                    //return false;
                 }
 
             }
@@ -1029,7 +1028,7 @@ namespace JapanesePuzzle
             return ret;
         }
 
-        public string DebugBruteForce()
+        public string DebugBruteForce(int[,] grid)
         {
             var e = Encoding.GetEncoding("iso-8859-1");
             var ret = string.Empty;
@@ -1049,15 +1048,15 @@ namespace JapanesePuzzle
                 Console.ResetColor();
                 for (int j = 0; j < ColumnsClues.Length; j++)
                 {
-                    if (BruteGrid[i, j] == 0)
+                    if (grid[i, j] == 0)
                         Console.Write("   ");
-                    else if (BruteGrid[i, j] == 1)
+                    else if (grid[i, j] == 1)
                     {
                         Console.ForegroundColor = ConsoleColor.Green;
                         Console.Write("  #");
                         Console.ResetColor();
                     }
-                    else if (BruteGrid[i, j] == -1)
+                    else if (grid[i, j] == -1)
                         Console.Write("  .");
                 }
                 Console.Write("\n");
