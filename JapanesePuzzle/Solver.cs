@@ -14,6 +14,7 @@ namespace JapanesePuzzle
         private List<Cell> Grid { get; set; }
         public int[,] BruteGrid;
         public string[][] ValidLines;
+        public string[][] ValidColumns;
 
         private int[][] LinesClues;
         private int[][] ColumnsClues;
@@ -108,7 +109,7 @@ namespace JapanesePuzzle
             BruteGrid = new int[ColumnSize, LineSize];
             foreach (var cell in Grid)
             {
-                BruteGrid[cell.Line, cell.Column] = 0;
+                BruteGrid[cell.Line, cell.Column] = cell.Value;
             }
 
             /*BruteLineClueSum = new int[ColumnSize];
@@ -127,12 +128,127 @@ namespace JapanesePuzzle
             for (int i = 0; i < ColumnSize; i++)
             {
                 var list = new List<string>();
-                DoPermutation(list, i, 0, string.Empty);
+                DoPermutation(list, 0, ColumnsClues.Length, i, LinesClues, string.Empty);
                 ValidLines[i] = list.ToArray();
+            }
+            ValidColumns = new string[LineSize][];
+            for (int i = 0; i < LineSize; i++)
+            {
+                var list = new List<string>();
+                DoPermutation(list, 0, LinesClues.Length, i, ColumnsClues, string.Empty);
+                ValidColumns[i] = list.ToArray();
             }
 
             TimeStart = DateTime.Now;
+
             TimeStartDebug = DateTime.Now;
+        }
+
+        public bool SolveMagically(int[,] grid)
+        {
+
+            while (true)
+            {
+
+                //
+                // LINHAS
+                //
+                // elimina os possiveis preenchimentos das linhas que nao são compativeis com o que esta no grid                
+                for (int l = 0; l < LinesClues.Length; l++)
+                {
+                    for (int k = 0; k < ValidLines[l].Length; k++)
+                    {
+                        for (int i = 0; i < ColumnsClues.Length; i++)
+                        {
+                            if ((grid[l, i] == 1 && ValidLines[l][k][i] == '0') || (grid[l, i] == 0 && ValidLines[l][k][i] == '1'))
+                            {
+                                ValidLines[l][k] = null;
+                                break;
+                            }
+                        }
+                    }
+                    ValidLines[l] = ValidLines[l].Where(x => x != null).ToArray();
+                }
+
+                // soma todas as linhas num grid auxiliar
+                var aux = new int[LinesClues.Length, ColumnsClues.Length];
+                for (int l = 0; l < LinesClues.Length; l++)
+                {
+                    for (int k = 0; k < ValidLines[l].Length; k++)
+                    {
+                        var str1 = ValidLines[l][k];
+                        for (int j = 0; j < ColumnsClues.Length; j++)
+                        {
+                            if (str1[j] == '0')
+                                continue;
+                            aux[l, j]++;
+                        }
+                    }
+                }
+
+                for (int i = 0; i < LinesClues.Length; i++)
+                {
+                    for (int j = 0; j < ColumnsClues.Length; j++)
+                    {
+                        if (aux[i, j] == ValidLines[i].Length)
+                        {
+                            grid[i, j] = 1;
+                        }
+                    }
+                }
+
+                //
+                // COLUNAS 
+                //
+                // elimina os possiveis preenchimentos das colunas que nao são compativeis com o que esta no grid
+                for (int l = 0; l < ColumnsClues.Length; l++)
+                {
+                    for (int k = 0; k < ValidColumns[l].Length; k++)
+                    {
+                        for (int i = 0; i < LinesClues.Length; i++)
+                        {
+                            if (grid[i, l] == 1 && ValidColumns[l][k][i] == '0')
+                            {
+                                ValidColumns[l][k] = null;
+                                break;
+                            }
+                        }
+                    }
+                    ValidColumns[l] = ValidColumns[l].Where(x => x != null).ToArray();
+                }
+
+                // soma todas as linhas num grid auxiliar
+                aux = new int[LinesClues.Length, ColumnsClues.Length];
+                for (int l = 0; l < ColumnsClues.Length; l++)
+                {
+                    for (int k = 0; k < ValidColumns[l].Length; k++)
+                    {
+                        var str1 = ValidColumns[l][k];
+                        for (int j = 0; j < LinesClues.Length; j++)
+                        {
+                            if (str1[j] == '0')
+                                continue;
+                            aux[j, l]++;
+                        }
+                    }
+                }
+
+                for (int i = 0; i < LinesClues.Length; i++)
+                {
+                    for (int j = 0; j < ColumnsClues.Length; j++)
+                    {
+                        if (aux[i, j] == ValidColumns[j].Length)
+                        {
+                            grid[i, j] = 1;
+                        }
+                    }
+                }
+
+                Console.Clear();
+                DebugBruteForce(grid);
+            }
+            return false;
+
         }
 
         public bool SolveBruteForce(int[,] grid, int i)
@@ -199,7 +315,7 @@ namespace JapanesePuzzle
                     if (!(combinations[k].Length == ColumnsClues[j][k] && combinations.Length > 1) &&
                         !(combinations[k].Length <= ColumnsClues[j][k] && k != combinations.Length - 1))
                         return false;
-                    
+
                     //return false;
                 }
 
@@ -208,17 +324,17 @@ namespace JapanesePuzzle
             return true;
         }
 
-        private void DoPermutation(List<string> permutations, int i, int j, string current)
+        private void DoPermutation(List<string> permutations, int depth, int n, int i, int[][] clues, string current)
         {
-            if (j >= ColumnsClues.Length)
+            if (depth >= n)
             {
                 // valida se é valido comparado com as pistas
                 var combinations = current.Split(new[] { "0" }, StringSplitOptions.RemoveEmptyEntries);
-                if (combinations.Length != LinesClues[i].Length) return;
+                if (combinations.Length != clues[i].Length) return;
 
-                for (int k = 0; k < LinesClues[i].Length; k++)
+                for (int k = 0; k < clues[i].Length; k++)
                 {
-                    if (combinations[k].Length != LinesClues[i][k]) return;
+                    if (combinations[k].Length != clues[i][k]) return;
                 }
 
                 permutations.Add(current);
@@ -226,10 +342,12 @@ namespace JapanesePuzzle
             }
 
             // se nao esta pintado
-            DoPermutation(permutations, i, j + 1, string.Format("{0}0", current));
+            DoPermutation(permutations, depth + 1, n, i, clues, string.Format("{0}0", current));
+            //DoPermutation(permutations, i, depth + 1, string.Format("{0}0", current));
 
             // se esta pintado
-            DoPermutation(permutations, i, j + 1, string.Format("{0}1", current));
+            DoPermutation(permutations, depth + 1, n, i, clues, string.Format("{0}1", current));
+            //DoPermutation(permutations, i, depth + 1, string.Format("{0}1", current));
 
         }
 

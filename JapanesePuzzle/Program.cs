@@ -22,34 +22,35 @@ namespace JapanesePuzzle
                 Console.Clear();
 
                 var solver = new Solver(arq);                
-                var res = solver.Solve();
-                if (!res)
+                //var res = solver.Solve();
+                //if (!res)
                 {
-                    solver.Debug();
-                    Console.WriteLine("As heuristicas nao resolveram completamente, deseja finalizar com o Backtracking? (S/N)");
-                    var bruteForce = Console.ReadLine();
+                    //solver.Debug();
+                    //Console.WriteLine("As heuristicas nao resolveram completamente, deseja finalizar com o Backtracking? (S/N)");
+                    //var bruteForce = Console.ReadLine();
 
-                    if (bruteForce == "S" || bruteForce == "s")
+                    //if (bruteForce == "S" || bruteForce == "s")
                     {
                         solver.PrepareBruteForce();
-                        res = solver.SolveBruteForce(solver.BruteGrid, 0);
+                        var res = solver.SolveMagically(solver.BruteGrid);
+                        //res = solver.SolveBruteForce(solver.BruteGrid, 0);
 
                         Console.Clear();
                         solver.DebugBruteForce(solver.BruteGrid);
                     }
                         
                 }
-                else
+                /*else
                 {
                     Console.Clear();
                     solver.Debug();
-                }
+                }*/
 
-                if (res)
+                /*if (res)
                     Console.WriteLine("Resolvido!!!");
                 else
                     Console.WriteLine("Não foi possivel resolver...");
-
+                */
                 read = Console.ReadLine();
                 Console.Clear();
             }
